@@ -1,0 +1,49 @@
+#
+# export $(cat secrets/*.env)
+# docker stack deploy -c registry.yml registry
+#
+version: "3.3"
+services:
+  server:
+    image: registry
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.backend=registry
+        - traefik.frontend.rule=Host:registry.${CLOUD_DNS_ENTRYPOINT}
+        - traefik.frontend.auth.basic=${REGISTRY_AUTH}
+        - traefik.port=5000
+        - traefik.docker.network=traefik-net
+    networks:
+      - default
+      - traefik-net
+  sock-proxy:
+    image: q2pus/socat
+    command: UNIX-LISTEN:/var/run/socat_registry/socat.sock,reuseaddr,fork TCP:server:5000
+    volumes:
+    - /tmp:/var/run/socat_registry
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+  local-proxy:
+    image: nginx:alpine
+    ports:
+      - mode: host
+        target: 80
+        published: 5000
+        protocol: tcp
+    deploy:
+      mode: global
+    configs:
+      - source: nginx
+        target: /etc/nginx/conf.d/default.conf
+
+networks:
+  traefik-net:
+    external: true
+configs:
+  nginx:
+    file: configs/nginx.conf

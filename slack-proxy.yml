@@ -1,0 +1,21 @@
+#
+# export $(cat secrets/*.env)
+# docker stack deploy -c slack-proxy.yml slack-proxy
+#
+version: "3.1"
+services:
+  agent:
+    image: soulshake/slack-dockerhub-integration
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.backend=slack-proxy
+        - traefik.frontend.rule=Host:slack.${CLOUD_DNS_ENTRYPOINT}
+        - traefik.port=8080
+        - traefik.docker.network=traefik-net
+    networks:
+      - traefik-net
+networks:
+  traefik-net:
+    external: true

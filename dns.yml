@@ -1,0 +1,18 @@
+#
+# docker stack deploy -c dns.yml dns
+#
+version: "3.2"
+services:
+  tinydns:
+    image: 127.0.0.1:5000/tinydns
+    ports:
+      - mode: host
+        target: 53
+        published: 53
+        protocol: tcp
+      - mode: host
+        target: 53
+        published: 53
+        protocol: udp
+    deploy:
+      mode: global

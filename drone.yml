@@ -1,0 +1,61 @@
+#
+# export $(cat secrets/*.env)
+# docker stack deploy -c drone.yml drone
+#
+version: "3.3"
+services:
+  postgres:
+    image: q2pus/postgres
+    environment:
+      - POSTGRES_PASSWORD=${DRONE_POSTGRES_PASSWORD}
+      - POSTGRES_POST_GIT=${DRONE_POSTGRES_POST}
+    secrets:
+      - source: rsa
+        target: id_rsa
+        mode: 0777
+  server:
+    image: drone/drone:0.7
+    environment:
+#      - DRONE_OPEN=true
+      - DRONE_HOST=http://drone.${CLOUD_DNS_ENTRYPOINT}
+      - DRONE_ADMIN=${DRONE_ADMIN}
+      - DRONE_GITLAB=true
+      - DRONE_GITLAB_URL=${DRONE_GITLAB_URL}
+      - DRONE_GITLAB_CLIENT=${DRONE_GITLAB_CLIENT}
+      - DRONE_GITLAB_SECRET=${DRONE_GITLAB_SECRET}
+      - DRONE_SECRET=${DRONE_SECRET}
+      - DRONE_DATABASE_DRIVER=postgres
+      - DRONE_DATABASE_DATASOURCE=postgres://postgres:${DRONE_POSTGRES_PASSWORD}@postgres:5432/postgres?sslmode=disable
+    ports:
+      - "8081:8000"
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - traefik.backend=drone
+        - traefik.frontend.rule=Host:drone.${CLOUD_DNS_ENTRYPOINT}
+        - traefik.port=8000
+        - traefik.docker.network=traefik-net
+    networks:
+      - default
+      - traefik-net
+  agent:
+    image: drone/drone:0.7
+    environment:
+      - DRONE_SERVER=ws://server:8000/ws/broker
+      - DRONE_SECRET=${DRONE_SECRET}
+    command: agent
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      mode: replicated
+      replicas: 3
+      placement:
+        constraints:
+          - node.role == manager
+secrets:
+  rsa:
+    file: secrets/drone-postgres_rsa
+networks:
+  traefik-net:
+    external: true

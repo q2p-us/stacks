@@ -1,0 +1,35 @@
+#
+# export $(cat secrets/*.env)
+# docker network create --driver=overlay traefik-net
+# docker stack deploy -c traefik.yml traefik
+#
+version: "3.3"
+services:
+  server:
+    image: traefik
+    command: --entryPoints='Name:http Address::80' \
+      --entryPoints='Name:https Address::443 TLS' \
+      --defaultEntryPoints=http,https \
+      --acme.entryPoint=https --acme.email=${ACME_EMAIL} \
+      --acme.storage=/etc/traefik/acme/acme.json \
+      --acme.domains=${ROOT_DOMAIN} \
+      --acme.acmeLogging=true \
+      --docker --docker.swarmmode --docker.domain=${CLOUD_DNS_ENTRYPOINT} --docker.watch \
+      --web
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8082:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/tmp:/etc/traefik/acme
+    networks:
+      - default
+      - traefik-net
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+networks:
+  traefik-net:
+    external: true
